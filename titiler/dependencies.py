@@ -145,7 +145,7 @@ class AssetsBidxParams(DefaultDependency):
     """Asset and Band indexes parameters."""
 
     assets: Optional[str] = Query(
-        ..., title="Asset indexes", description="comma (',') delimited asset names.",
+        None, title="Asset indexes", description="comma (',') delimited asset names.",
     )
     bidx: Optional[str] = Query(
         None, title="Band indexes", description="comma (',') delimited band indexes",

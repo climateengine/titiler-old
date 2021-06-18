@@ -46,6 +46,8 @@ from fastapi import APIRouter, Depends, Path, Query
 from starlette.requests import Request
 from starlette.responses import Response
 
+import math
+
 img_endpoint_params: Dict[str, Any] = {
     "responses": {
         200: {
@@ -115,13 +117,10 @@ class BaseTilerFactory(metaclass=abc.ABCMeta):
         """Register Tiler Routes."""
         ...
 
-    def url_for(self, request: Request, name: str, **path_params: Any) -> str:
+    @staticmethod
+    def url_for(request: Request, name: str, **path_params: Any) -> str:
         """Return full url (with prefix) for a specific endpoint."""
-        url_path = self.router.url_path_for(name, **path_params)
-        base_url = str(request.base_url)
-        if self.router_prefix:
-            base_url += self.router_prefix.lstrip("/")
-        return url_path.make_absolute_url(base_url=base_url)
+        return request.url_for(name, **path_params)
 
 
 @dataclass
@@ -166,6 +165,8 @@ class TilerFactory(BaseTilerFactory):
 
         if self.add_part:
             self.part()
+
+        self.buffer()
 
     ############################################################################
     # /bounds
@@ -557,6 +558,60 @@ class TilerFactory(BaseTilerFactory):
             return {"coordinates": [lon, lat], "values": values}
 
     ############################################################################
+    # /buffer
+    ############################################################################
+    def buffer(self):
+        """Register /buffer endpoints."""
+
+        @self.router.get(
+            r"/buffer/{lon},{lat}",
+            responses={200: {"description": "Return a value for a point"}},
+        )
+        def buffer(
+            response: Response,
+            lon: float = Path(..., description="Longitude"),
+            lat: float = Path(..., description="Latitude"),
+            r: float = Query(10.0, description="Radius of area around point"),
+            src_path=Depends(self.path_dependency),
+            layer_params=Depends(self.layer_dependency),
+            dataset_params=Depends(self.dataset_dependency),
+            kwargs: Dict = Depends(self.additional_dependency),
+        ):
+            """Create image from part of a dataset."""
+            timings = []
+
+            dlat = r/111111
+            dlon = r/(111111 * math.cos(math.radians(lat)))
+            bbox = [lon-dlon, lat-dlat, lon+dlon, lat+dlat]
+
+            with utils.Timer() as t:
+                with rasterio.Env(**self.gdal_config):
+                    with self.reader(src_path, **self.reader_options) as src_dst:
+                        data = src_dst.part(
+                            bbox,
+                            **layer_params.kwargs,
+                            **dataset_params.kwargs,
+                            **kwargs,
+                        )
+            timings.append(("dataread", round(t.elapsed * 1000, 2)))
+
+            with utils.Timer() as t:
+                data = data.as_masked()
+                data = data.mean(axis=(1, 2)).tolist()
+
+            timings.append(("postprocess", round(t.elapsed * 1000, 2)))
+
+            if OptionalHeader.server_timing in self.optional_headers:
+                response.headers["Server-Timing"] = ", ".join(
+                    [f"{name};dur={time}" for (name, time) in timings]
+                )
+
+            return {"coordinates": [lon, lat],
+                    "bbox": bbox,
+                    "values": data}
+
+
+    ############################################################################
     # /preview (Optional)
     ############################################################################
     def preview(self):
@@ -731,6 +786,8 @@ class MultiBaseTilerFactory(TilerFactory):
             """Return dataset's basic info or the list of available assets."""
             with rasterio.Env(**self.gdal_config):
                 with self.reader(src_path, **self.reader_options) as src_dst:
+                    if asset_params.assets is None:
+                        asset_params.kwargs['assets'] = src_dst.assets
                     return src_dst.info(**asset_params.kwargs, **kwargs)
 
         @self.router.get(
@@ -753,6 +810,8 @@ class MultiBaseTilerFactory(TilerFactory):
             """Return dataset's basic info as a GeoJSON feature."""
             with rasterio.Env(**self.gdal_config):
                 with self.reader(src_path, **self.reader_options) as src_dst:
+                    if asset_params.assets is None:
+                        asset_params.kwargs['assets'] = src_dst.assets
                     info = {"dataset": src_path}
                     info["assets"] = {
                         asset: meta.dict(exclude_none=True)
@@ -799,6 +858,8 @@ class MultiBaseTilerFactory(TilerFactory):
             """Return metadata."""
             with rasterio.Env(**self.gdal_config):
                 with self.reader(src_path, **self.reader_options) as src_dst:
+                    if asset_params.assets is None:
+                        asset_params.kwargs['assets'] = src_dst.assets
                     return src_dst.metadata(
                         metadata_params.pmin,
                         metadata_params.pmax,
