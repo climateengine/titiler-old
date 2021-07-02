@@ -316,6 +316,8 @@ class TilerFactory(BaseTilerFactory):
                     with self.reader(
                         src_path, tms=tms, **self.reader_options
                     ) as src_dst:
+                        if layer_params.assets is None:
+                            layer_params.kwargs['assets'] = src_dst.assets
                         data = src_dst.tile(
                             x,
                             y,
@@ -541,6 +543,8 @@ class TilerFactory(BaseTilerFactory):
             with utils.Timer() as t:
                 with rasterio.Env(**self.gdal_config):
                     with self.reader(src_path, **self.reader_options) as src_dst:
+                        if layer_params.assets is None:
+                            layer_params.kwargs['assets'] = src_dst.assets
                         values = src_dst.point(
                             lon,
                             lat,
@@ -587,6 +591,8 @@ class TilerFactory(BaseTilerFactory):
             with utils.Timer() as t:
                 with rasterio.Env(**self.gdal_config):
                     with self.reader(src_path, **self.reader_options) as src_dst:
+                        if layer_params.assets is None:
+                            layer_params.kwargs['assets'] = src_dst.assets
                         data = src_dst.part(
                             bbox,
                             **layer_params.kwargs,
@@ -638,6 +644,8 @@ class TilerFactory(BaseTilerFactory):
             with utils.Timer() as t:
                 with rasterio.Env(**self.gdal_config):
                     with self.reader(src_path, **self.reader_options) as src_dst:
+                        if layer_params.assets is None:
+                            layer_params.kwargs['assets'] = src_dst.assets
                         data = src_dst.preview(
                             **layer_params.kwargs,
                             **img_params.kwargs,
@@ -708,6 +716,8 @@ class TilerFactory(BaseTilerFactory):
             with utils.Timer() as t:
                 with rasterio.Env(**self.gdal_config):
                     with self.reader(src_path, **self.reader_options) as src_dst:
+                        if layer_params.assets is None:
+                            layer_params.kwargs['assets'] = src_dst.assets
                         data = src_dst.part(
                             [minx, miny, maxx, maxy],
                             **layer_params.kwargs,
@@ -1163,6 +1173,8 @@ class MosaicTilerFactory(BaseTilerFactory):
                         reader_options=self.reader_options,
                         **self.backend_options,
                     ) as src_dst:
+                        if layer_params.assets is None:
+                            layer_params.kwargs['assets'] = src_dst.assets
                         mosaic_read = t.from_start
                         timings.append(("mosaicread", round(mosaic_read * 1000, 2)))
 
@@ -1403,6 +1415,8 @@ class MosaicTilerFactory(BaseTilerFactory):
                         reader_options=self.reader_options,
                         **self.backend_options,
                     ) as src_dst:
+                        if layer_params.assets is None:
+                            layer_params.kwargs['assets'] = src_dst.assets
                         mosaic_read = t.from_start
                         timings.append(("mosaicread", round(mosaic_read * 1000, 2)))
                         values = src_dst.point(

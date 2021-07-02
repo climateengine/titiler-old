@@ -179,10 +179,6 @@ class AssetsBidxExprParams(DefaultDependency):
 
     def __post_init__(self):
         """Post Init."""
-        if not self.assets and not self.expression:
-            raise MissingAssets(
-                "assets must be defined either via expression or assets options."
-            )
 
         if self.assets is not None:
             self.kwargs["assets"] = self.assets.split(",")
