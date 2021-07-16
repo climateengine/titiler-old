@@ -602,8 +602,12 @@ class TilerFactory(BaseTilerFactory):
             timings.append(("dataread", round(t.elapsed * 1000, 2)))
 
             with utils.Timer() as t:
+                print(f"titiler: data: {data}")
                 data = data.as_masked()
+                print(f"titiler: data: {data}")
                 data = data.mean(axis=(1, 2)).tolist()
+                print(f"titiler: data: {data}")
+
 
             timings.append(("postprocess", round(t.elapsed * 1000, 2)))
 
